@@ -21,7 +21,7 @@ on:
 # (y los de Windows se pagan más que los de Linux). Si se empuja otro commit a la misma
 # rama mientras compila, la compilación vieja se cancela: solo importa la última.
 concurrency:
-  group: puente-${{ github.ref }}
+  group: puente-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
