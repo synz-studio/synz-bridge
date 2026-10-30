@@ -31,6 +31,8 @@ async function crear() {
   const datos = fs.mkdtempSync(path.join(os.tmpdir(), 'puente-diag-'));
   const p = await arrancar(process.env.EXE_PUENTE, ['--sin-ventana', '--sin-preguntar', '--cerrar-con-entrada', '--puerto', '0',
     '--datos', datos, '--permitir-origen', ORIGEN, '--carpeta-plugins', process.env.VST3_DIR], { plazoMs: 60000 });
+  let salida = null;
+  p.hijo.on('exit', (codigo, senal) => { salida = `código=${codigo} señal=${senal}`; console.log('EL PROCESO DEL PUENTE TERMINÓ:', salida); });
   try {
     const c = await Control.abrir(p.puerto, ORIGEN);
     for (let i = 0; i < 100; i++) { const h = await c.pedir('hola'); if (!h.escaneando && h.plugins >= 1) break; await esperar(200); }
@@ -49,6 +51,14 @@ async function crear() {
     }
     c.cerrar();
   } catch (e) { console.log('fallo:', e.message); }
+  await esperar(4000);
+  console.log('terminó el puente:', salida ?? 'no');
+  try {
+    const dir = path.join(os.homedir(), 'Library', 'Logs', 'DiagnosticReports');
+    const informes = fs.readdirSync(dir).filter((f) => /synz|bridge/i.test(f)).sort();
+    console.log('informes de cierre inesperado:', informes.join(', ') || '(ninguno)');
+    if (informes.length) console.log(fs.readFileSync(path.join(dir, informes[informes.length - 1]), 'utf8').slice(0, 9000));
+  } catch (e) { console.log('sin informes:', e.message); }
   console.log('--- salida del puente:\n' + p.salida().slice(-2000));
   console.log('--- errores del puente:\n' + p.errores().slice(-2000));
   for (const f of fs.readdirSync(datos, { recursive: true })) {
