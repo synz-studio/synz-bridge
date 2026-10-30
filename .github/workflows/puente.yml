@@ -170,6 +170,8 @@ jobs:
           cmake -S . -B build-uni -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DSYNZ_PUENTE_PRUEBAS=OFF
           cmake --build build-uni --config Release --target synz-puente
           lipo -info "build-uni/fuente/synz-puente_artefacts/Release/SYNZ Bridge.app/Contents/MacOS/SYNZ Bridge"
+          plutil -p "build-uni/fuente/synz-puente_artefacts/Release/SYNZ Bridge.app/Contents/Info.plist" | tee plist.txt
+          grep -q 'synz-bridge' plist.txt || { echo 'FALTA el esquema synz-bridge en el Info.plist'; exit 1; }
       - name: Empaquetar
         run: |
           mkdir -p dist

@@ -5,8 +5,9 @@ juce_add_gui_app(synz-puente
   BUNDLE_ID "studio.synz.puente"
   ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/icono/synz-bridge.png"
   ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/icono/synz-bridge.png"
-  # macOS: el enlace synz-bridge://abrir (el botón ABRIR del estudio) se registra en el Info.plist del paquete
-  PLIST_TO_MERGE "<key>CFBundleURLTypes</key><array><dict><key>CFBundleURLName</key><string>SYNZ Bridge</string><key>CFBundleURLSchemes</key><array><string>synz-bridge</string></array></dict></array>"
+  # macOS: el enlace synz-bridge://abrir (el botón ABRIR del estudio) se registra en el Info.plist del paquete.
+  # Ojo: JUCE solo mezcla el fragmento si viene entero, <plist><dict>…</dict></plist>; suelto lo ignora sin avisar.
+  PLIST_TO_MERGE "<plist><dict><key>CFBundleURLTypes</key><array><dict><key>CFBundleURLName</key><string>SYNZ Bridge</string><key>CFBundleURLSchemes</key><array><string>synz-bridge</string></array></dict></array></dict></plist>"
   VERSION ${PROJECT_VERSION})
 
 target_sources(synz-puente PRIVATE
