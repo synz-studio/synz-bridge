@@ -29,8 +29,10 @@ async function eco() {
 async function crear() {
   cuenta('crear un plugin VST3 de prueba en el puente');
   const datos = fs.mkdtempSync(path.join(os.tmpdir(), 'puente-diag-'));
-  const p = await arrancar(process.env.EXE_PUENTE, ['--sin-ventana', '--sin-preguntar', '--cerrar-con-entrada', '--puerto', '0',
-    '--datos', datos, '--permitir-origen', ORIGEN, '--carpeta-plugins', process.env.VST3_DIR], { plazoMs: 60000 });
+  // Se lanza dentro de lldb (en lote): si el proceso cae, lldb imprime la pila de todos los hilos.
+  const args = ['--sin-ventana', '--sin-preguntar', '--puerto', '0',
+    '--datos', datos, '--permitir-origen', ORIGEN, '--carpeta-plugins', process.env.VST3_DIR];
+  const p = await arrancar('lldb', ['--batch', '-o', 'run', '-k', 'bt all', '-k', 'quit', '--', process.env.EXE_PUENTE, ...args], { plazoMs: 120000 });
   let salida = null;
   p.hijo.on('exit', (codigo, senal) => { salida = `código=${codigo} señal=${senal}`; console.log('EL PROCESO DEL PUENTE TERMINÓ:', salida); });
   try {
@@ -59,7 +61,7 @@ async function crear() {
     console.log('informes de cierre inesperado:', informes.join(', ') || '(ninguno)');
     if (informes.length) console.log(fs.readFileSync(path.join(dir, informes[informes.length - 1]), 'utf8').slice(0, 9000));
   } catch (e) { console.log('sin informes:', e.message); }
-  console.log('--- salida del puente:\n' + p.salida().slice(-2000));
+  console.log('--- salida del puente:\n' + p.salida().slice(-12000));
   console.log('--- errores del puente:\n' + p.errores().slice(-2000));
   for (const f of fs.readdirSync(datos, { recursive: true })) {
     const ruta = path.join(datos, String(f));
