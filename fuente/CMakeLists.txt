@@ -48,3 +48,15 @@ target_link_libraries(synz-puente PRIVATE
 if(APPLE)
   target_link_libraries(synz-puente PRIVATE "-framework CoreAudioKit")
 endif()
+
+# En macOS el programa y cada plugin JUCE que aloja llevan su propia copia de JUCE. Si el programa exporta sus símbolos,
+# dyld une las funciones comunes de las dos copias y, si no son idénticas, se corrompe la memoria (caída «pointer being
+# freed was not allocated» al abrir el editor de un plugin hecho con JUCE). Con la visibilidad oculta cada copia usa la suya.
+if(APPLE)
+  set_target_properties(synz-puente PROPERTIES
+    C_VISIBILITY_PRESET hidden
+    CXX_VISIBILITY_PRESET hidden
+    OBJC_VISIBILITY_PRESET hidden
+    OBJCXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN ON)
+endif()
