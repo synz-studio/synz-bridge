@@ -21,6 +21,13 @@ async function eco() {
       const r = await new Promise((res) => { const t = setTimeout(() => res('SIN RESPUESTA'), 3000); ws.once('message', (d) => { clearTimeout(t); res(d.toString()); }); ws.send(txt); });
       console.log(JSON.stringify(txt), '->', JSON.stringify(r));
     }
+    // Mensajes binarios de tamaño creciente: ¿a partir de cuál no vuelve el eco?
+    for (const n of [1000, 16000, 32000, 65000, 70000, 100000, 150000]) {
+      const t0 = Date.now();
+      const r = await new Promise((res) => { const t = setTimeout(() => res('SIN RESPUESTA'), 4000); ws.once('message', (d) => { clearTimeout(t); res(d.length); }); ws.send(Buffer.alloc(n, 7)); });
+      console.log(`binario ${n} ->`, r, `(${Date.now() - t0} ms)`);
+      if (r === 'SIN RESPUESTA') break;
+    }
     ws.close();
   } catch (e) { console.log('fallo:', e.message); }
   await parar(srv);
@@ -29,10 +36,9 @@ async function eco() {
 async function crear() {
   cuenta('crear un plugin VST3 de prueba en el puente');
   const datos = fs.mkdtempSync(path.join(os.tmpdir(), 'puente-diag-'));
-  // Se lanza dentro de lldb (en lote): si el proceso cae, lldb imprime la pila de todos los hilos.
-  const args = ['--sin-ventana', '--sin-preguntar', '--puerto', '0',
+  const args = ['--sin-ventana', '--sin-preguntar', '--cerrar-con-entrada', '--puerto', '0',
     '--datos', datos, '--permitir-origen', ORIGEN, '--carpeta-plugins', process.env.VST3_DIR];
-  const p = await arrancar('lldb', ['--batch', '-o', 'run', '-k', 'bt all', '-k', 'quit', '--', process.env.EXE_PUENTE, ...args], { plazoMs: 120000 });
+  const p = await arrancar(process.env.EXE_PUENTE, args, { plazoMs: 60000 });
   let salida = null;
   p.hijo.on('exit', (codigo, senal) => { salida = `código=${codigo} señal=${senal}`; console.log('EL PROCESO DEL PUENTE TERMINÓ:', salida); });
   try {

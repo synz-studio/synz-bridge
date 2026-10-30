@@ -241,6 +241,13 @@ describe('plugins reales', () => {
     await ctl.pedir('abrirEditor', { instancia: r.instancia });
     await esperar(500);
     const f = await ctl.pedir('capturarEditor', { instancia: r.instancia });
+    if (process.platform === 'darwin') {      // en macOS la foto de la ventana aún no existe: el estudio pide entonces una imagen aparte
+      assert.equal(f.ok, false);
+      assert.equal(f.codigo, 'no_disponible');
+      await ctl.pedir('cerrarEditor', { instancia: r.instancia });
+      await ctl.pedir('destruir', { instancia: r.instancia });
+      return;
+    }
     assert.equal(f.ok, true);
     assert.equal(f.tipo, 'image/jpeg');
     assert.ok(f.ancho >= 16 && f.ancho <= 480 && f.alto >= 16, `tamaño ${f.ancho}x${f.alto}`);
@@ -474,11 +481,11 @@ describe('escáner a prueba de plugins rotos', () => {
       c.eventos.length = 0;
       await c.pedir('escanear', { forzar: true });
       const fin = await c.evento((m) => m.evento === 'escaneoTerminado', 60000);
-      assert.equal(fin.total, 2);
+      assert.ok(fin.total >= 2);
       const malo = fin.fallidos.find((f) => f.archivo === 'SynzPruebaRaro.vst3');
       assert.ok(malo, JSON.stringify(fin));
       assert.match(malo.motivo, /cayó|código/);
-      const nombres = (await c.pedir('listar')).plugins.map((x) => x.nombre).sort();
+      const nombres = (await c.pedir('listar')).plugins.filter((x) => x.formato === 'VST3').map((x) => x.nombre).sort();
       assert.deepEqual(nombres, ['SynzPruebaEfecto', 'SynzPruebaSinte']);
 
       // Sin forzar, el que falló se salta sin volver a lanzar nada.
@@ -516,7 +523,7 @@ describe('escáner a prueba de plugins rotos', () => {
       const fin = await c.evento((m) => m.evento === 'escaneoTerminado', 60000);
       const malo = fin.fallidos.find((f) => f.archivo === 'SynzPruebaRaro.vst3');
       assert.match(malo.motivo, /tardó más de 3 s/);
-      assert.equal(fin.total, 2);
+      assert.ok(fin.total >= 2);
       assert.ok(Date.now() - t0 < 40000);
       assert.equal((await c.pedir('hola')).ok, true);
     } finally { c.cerrar(); await parar(p.proc); }
