@@ -43,3 +43,8 @@ target_link_libraries(synz-puente PRIVATE
   juce::juce_core
   juce::juce_recommended_config_flags
   juce::juce_recommended_warning_flags)
+
+# Alojar plugins AU en macOS necesita CoreAudioKit (AUGenericView); JUCE no lo añade solo al enlazar.
+if(APPLE)
+  target_link_libraries(synz-puente PRIVATE "-framework CoreAudioKit")
+endif()

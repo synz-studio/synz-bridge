@@ -6,7 +6,7 @@
   #define Version "0.0.0"
 #endif
 #ifndef Origen
-  #define Origen "..\..\build\fuente\synz-puente_artefacts\Release"
+  #define Origen "..\build\fuente\synz-puente_artefacts\Release"
 #endif
 
 [Setup]
@@ -21,7 +21,7 @@ DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-OutputDir=..\..\dist
+OutputDir=..\dist
 OutputBaseFilename=SYNZ-Bridge-Setup
 SetupIconFile=..\fuente\icono\synz-bridge.ico
 UninstallDisplayIcon={app}\SYNZ Bridge.exe
