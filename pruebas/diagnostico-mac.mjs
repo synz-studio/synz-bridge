@@ -14,7 +14,9 @@ const cuenta = (t) => console.log('\n=== ' + t);
 
 async function eco() {
   cuenta('servidor eco');
-  const srv = await arrancar(process.env.EXE_WS_ECO, ['--puerto', '0', '--origen', ORIGEN], { plazoMs: 30000 });
+  const srv = await arrancar(process.env.EXE_WS_ECO, ['--puerto', '0', '--origen', ORIGEN, '--carga-max', '200000', '--max-conexiones', '12'], { plazoMs: 30000 });
+    const r0 = await fetch(`http://127.0.0.1:${srv.puerto}/`);
+    console.log('GET / ->', r0.status, await r0.text());
   try {
     const ws = await new Promise((res, rej) => { const w = new WebSocket(`ws://127.0.0.1:${srv.puerto}/eco`, { origin: ORIGEN }); w.once('open', () => res(w)); w.once('error', rej); });
     for (const txt of ['abc', 'ñ', '🎹', 'hola ñ 🎹']) {

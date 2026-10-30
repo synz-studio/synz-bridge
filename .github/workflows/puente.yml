@@ -112,7 +112,7 @@ jobs:
     # plugins VST3 de prueba) y se pasan las pruebas completas. Solo Apple Silicon (el del propio runner) de momento.
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.mac }}
     runs-on: macos-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -160,10 +160,16 @@ jobs:
           EXE_PUENTE: ${{ github.workspace }}/build/fuente/synz-puente_artefacts/Release/SYNZ Bridge.app/Contents/MacOS/SYNZ Bridge
           VST3_DIR: ${{ github.workspace }}/build/vst3-pruebas
         run: node --test puente.test.mjs
+      - name: Programa universal (Intel y Apple Silicon), solo el programa
+        timeout-minutes: 40
+        run: |
+          cmake -S . -B build-uni -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DSYNZ_PUENTE_PRUEBAS=OFF
+          cmake --build build-uni --config Release --target synz-puente
+          lipo -info "build-uni/fuente/synz-puente_artefacts/Release/SYNZ Bridge.app/Contents/MacOS/SYNZ Bridge"
       - name: Empaquetar
         run: |
           mkdir -p dist
-          ditto -c -k --keepParent "build/fuente/synz-puente_artefacts/Release/SYNZ Bridge.app" "dist/SYNZ-Bridge-mac.zip"
+          ditto -c -k --keepParent "build-uni/fuente/synz-puente_artefacts/Release/SYNZ Bridge.app" "dist/SYNZ-Bridge-mac.zip"
           cp README.md LICENSE dist/
       - uses: actions/upload-artifact@v4
         with:
