@@ -1,0 +1,18 @@
+{
+  "name": "synz-puente-pruebas",
+  "private": true,
+  "type": "module",
+  "description": "Pruebas del puente de plugins nativos (servidor WebSocket, alojamiento de plugins y cliente del navegador)",
+  "scripts": {
+    "ws": "node --test ws.test.mjs",
+    "puente": "node --test puente.test.mjs",
+    "todo": "node --test",
+    "cliente": "node --test cliente.test.mjs",
+    "sincronia": "node --test sincronia.test.mjs",
+    "estudio": "node --test estudio.test.mjs"
+  },
+  "devDependencies": {
+    "ws": "8.18.0",
+    "playwright-core": "1.56.1"
+  }
+}

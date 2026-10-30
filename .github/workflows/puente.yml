@@ -1,0 +1,162 @@
+name: Puente (compilar y probar)
+
+# Compila SYNZ Bridge en Windows y deja el programa listo para descargar (pestaña del trabajo > Artifacts).
+# No sube nada a ningún servidor ni usa secretos. Se lanza al empujar a main, en pull requests o a mano («Run workflow»).
+on:
+  workflow_dispatch:
+    inputs:
+      windows:
+        description: 'Compilar la versión de Windows'
+        type: boolean
+        default: true
+      mac:
+        description: 'Compilar también la de macOS (tarda; solo a mano)'
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+  pull_request:
+
+# Ahorro de minutos (29 oct 2026): una compilación en Windows son ~24 minutos de GitHub
+# (y los de Windows se pagan más que los de Linux). Si se empuja otro commit a la misma
+# rama mientras compila, la compilación vieja se cancela: solo importa la última.
+concurrency:
+  group: puente-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.windows }}
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Configurar (JUCE se descarga solo)
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
+      - name: Compilar
+        run: cmake --build build --config Release --parallel
+      - name: Dependencias de las pruebas
+        working-directory: pruebas
+        run: npm ci
+      - name: Prueba del servidor WebSocket (Winsock)
+        working-directory: pruebas
+        continue-on-error: true
+        env:
+          EXE_WS_ECO: ${{ github.workspace }}\build\pruebas\ws-eco_artefacts\Release\ws-eco.exe
+        run: node --test ws.test.mjs
+      - name: Prueba del puente con plugins VST3 de verdad
+        working-directory: pruebas
+        continue-on-error: true
+        env:
+          EXE_PUENTE: ${{ github.workspace }}\build\fuente\synz-puente_artefacts\Release\SYNZ Bridge.exe
+          VST3_DIR: ${{ github.workspace }}\build\vst3-pruebas
+        run: node --test puente.test.mjs
+      - name: Empaquetar
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/SYNZ-Bridge | Out-Null
+          Copy-Item "build/fuente/synz-puente_artefacts/Release/SYNZ Bridge.exe" dist/SYNZ-Bridge/
+          Copy-Item README.md, LICENSE dist/SYNZ-Bridge/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SYNZ-Bridge-windows
+          path: dist/SYNZ-Bridge
+      # El instalador (Inno Setup, preinstalado con choco): sin permisos de administrador, con «abrir al iniciar sesión» y el enlace synz-bridge://.
+      - name: Instalador
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          $version = (Select-String -Path fuente/Puente.h -Pattern 'versionPuente = "([0-9.]+)"').Matches[0].Groups[1].Value
+          $origen = (Resolve-Path "build/fuente/synz-puente_artefacts/Release").Path
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DVersion=$version" "/DOrigen=$origen" instalador/synz-bridge.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC falló" }
+          Get-ChildItem dist
+          "$version" | Out-File -Encoding ascii dist/version.txt
+      - name: Probar el instalador (instalar, mirar, desinstalar)
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP "SYNZ Bridge test"
+          $p = Start-Process -FilePath dist/SYNZ-Bridge-Setup.exe -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/TASKS=arranque","/DIR=`"$dir`"" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "El instalador salió con $($p.ExitCode)" }
+          if (-not (Test-Path "$dir\SYNZ Bridge.exe")) { throw "No se instaló el programa" }
+          $run = (Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "SYNZ Bridge" -ErrorAction SilentlyContinue)."SYNZ Bridge"
+          if (-not $run -or $run -notmatch "--en-segundo-plano") { throw "Falta «abrir al iniciar sesión»: [$run]" }
+          $cmd = (Get-ItemProperty "HKCU:\Software\Classes\synz-bridge\shell\open\command" -ErrorAction SilentlyContinue)."(default)"
+          if (-not $cmd -or $cmd -notmatch "SYNZ Bridge.exe") { throw "Falta el enlace synz-bridge://: [$cmd]" }
+          Write-Host "Instalado bien: $run | $cmd"
+          $u = Start-Process -FilePath "$dir\unins000.exe" -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART" -Wait -PassThru
+          Start-Sleep -Seconds 3
+          if (Test-Path "$dir\SYNZ Bridge.exe") { throw "El desinstalador no quitó el programa" }
+          if (Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "SYNZ Bridge" -ErrorAction SilentlyContinue) { throw "El desinstalador dejó «abrir al iniciar sesión»" }
+          if (Test-Path "HKCU:\Software\Classes\synz-bridge") { throw "El desinstalador dejó el enlace synz-bridge://" }
+          Write-Host "Desinstalado bien."
+      # El código fuente que acompaña al programa (AGPL).
+      - name: Código fuente (AGPL)
+        shell: pwsh
+        run: git archive --format=zip --prefix=SYNZ-Bridge-fuente/ -o dist/SYNZ-Bridge-fuente.zip HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SYNZ-Bridge-instalador
+          path: |
+            dist/SYNZ-Bridge-Setup.exe
+            dist/SYNZ-Bridge-fuente.zip
+            dist/version.txt
+
+  # macOS: SOLO a mano («Run workflow» con «mac» marcado). Sin firmar ni notarizar: macOS pedirá abrirlo con clic derecho › Abrir.
+  # Sin probar en un Mac de verdad: lo que sale de aquí es un punto de partida.
+  macos:
+    # Repositorio público: los minutos de Actions son gratis, así que aquí se compila todo (programa, servidor eco y
+    # plugins VST3 de prueba) y se pasan las pruebas completas. Solo Apple Silicon (el del propio runner) de momento.
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.mac }}
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Configurar (JUCE se descarga solo; solo Apple Silicon)
+        timeout-minutes: 10
+        run: |
+          command -v ninja >/dev/null || brew install ninja
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64
+      - name: Compilar el programa, el servidor eco y los plugins de prueba
+        timeout-minutes: 70
+        run: cmake --build build --config Release
+      - name: Dependencias de las pruebas
+        working-directory: pruebas
+        run: npm ci
+      - name: Prueba del servidor WebSocket
+        working-directory: pruebas
+        timeout-minutes: 5
+        continue-on-error: true
+        env:
+          EXE_WS_ECO: ${{ github.workspace }}/build/pruebas/ws-eco_artefacts/Release/ws-eco
+        run: node --test ws.test.mjs
+      - name: Prueba de humo del programa (arranca, «hola», escaneo con los AU de Apple)
+        working-directory: pruebas
+        timeout-minutes: 5
+        continue-on-error: true
+        env:
+          EXE_PUENTE: ${{ github.workspace }}/build/fuente/synz-puente_artefacts/Release/SYNZ Bridge.app/Contents/MacOS/SYNZ Bridge
+        run: node humo.mjs
+      - name: Prueba del puente con plugins VST3 de prueba
+        working-directory: pruebas
+        timeout-minutes: 10
+        continue-on-error: true
+        env:
+          EXE_PUENTE: ${{ github.workspace }}/build/fuente/synz-puente_artefacts/Release/SYNZ Bridge.app/Contents/MacOS/SYNZ Bridge
+          VST3_DIR: ${{ github.workspace }}/build/vst3-pruebas
+        run: node --test puente.test.mjs
+      - name: Empaquetar
+        run: |
+          mkdir -p dist
+          ditto -c -k --keepParent "build/fuente/synz-puente_artefacts/Release/SYNZ Bridge.app" "dist/SYNZ-Bridge-mac.zip"
+          cp README.md LICENSE dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SYNZ-Bridge-mac
+          path: dist

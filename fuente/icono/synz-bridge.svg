@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- SYNZ Bridge: la onda de SYNZ (la de la barra del estudio: M1 7 C 3 1, 6 1, 9 7 S 15 13, 17 7, trazo 1,8 de 18, #6D74F5) y «VST», en un cuadrado oscuro -->
+  <rect width="1024" height="1024" rx="224" fill="#06080F"/>
+  <path d="M176 380 C 260 128, 386 128, 512 380 S 764 632, 848 380" fill="none" stroke="#6D74F5" stroke-width="76" stroke-linecap="round"/>
+  <text x="512" y="858" text-anchor="middle" font-family="Inter, 'Segoe UI', Arial, Helvetica, sans-serif" font-weight="700" font-size="290" letter-spacing="14" fill="#E6E9EE">VST</text>
+</svg>
