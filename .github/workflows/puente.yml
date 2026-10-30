@@ -13,6 +13,10 @@ on:
         description: 'Compilar también la de macOS (tarda; solo a mano)'
         type: boolean
         default: false
+      publicar_mac:
+        description: 'PUBLICAR la versión de macOS como release «mac» de este repositorio (de ahí la baja el botón DESCARGAR del estudio). Necesita «mac» marcado.'
+        type: boolean
+        default: false
   push:
     branches: [main]
   pull_request:
@@ -175,3 +179,39 @@ jobs:
         with:
           name: SYNZ-Bridge-mac
           path: dist
+
+  # PUBLICAR macOS: solo a mano, con «mac» y «publicar_mac» marcados. Crea (o actualiza) el release «mac» con el zip y su suma de
+  # comprobación. Enlace estable: https://github.com/synz-studio/synz-bridge/releases/download/mac/SYNZ-Bridge-mac.zip
+  publicar-mac:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.mac && inputs.publicar_mac }}
+    needs: macos
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: SYNZ-Bridge-mac
+          path: dist
+      - name: Release «mac»
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(grep -oE 'versionPuente = "[0-9.]+"' fuente/Puente.h | grep -oE '[0-9.]+')
+          suma=$(sha256sum dist/SYNZ-Bridge-mac.zip | cut -d' ' -f1)
+          cat > notas.md <<EOF
+          SYNZ Bridge $version para macOS (Intel y Apple Silicon), sin firmar.
+
+          La primera vez que lo abras, macOS dirá que no puede comprobar el programa: clic derecho sobre SYNZ Bridge › Abrir › Abrir
+          (o Ajustes del Sistema › Privacidad y seguridad › Abrir igualmente).
+
+          SHA-256 de SYNZ-Bridge-mac.zip: $suma
+          Compilado por GitHub Actions a partir de $GITHUB_SHA.
+          EOF
+          if gh release view mac >/dev/null 2>&1; then
+            gh release edit mac --title "SYNZ Bridge para macOS" --notes-file notas.md
+          else
+            gh release create mac --title "SYNZ Bridge para macOS" --notes-file notas.md --target "$GITHUB_SHA"
+          fi
+          gh release upload mac dist/SYNZ-Bridge-mac.zip --clobber
