@@ -129,9 +129,18 @@ jobs:
       - name: Dependencias de las pruebas
         working-directory: pruebas
         run: npm ci
+      - name: Diagnóstico (eco con ñ y emoji; crear un plugin; muestra del proceso si se cuelga)
+        working-directory: pruebas
+        timeout-minutes: 4
+        continue-on-error: true
+        env:
+          EXE_WS_ECO: ${{ github.workspace }}/build/pruebas/ws-eco_artefacts/Release/ws-eco
+          EXE_PUENTE: ${{ github.workspace }}/build/fuente/synz-puente_artefacts/Release/SYNZ Bridge.app/Contents/MacOS/SYNZ Bridge
+          VST3_DIR: ${{ github.workspace }}/build/vst3-pruebas
+        run: node diagnostico-mac.mjs
       - name: Prueba del servidor WebSocket
         working-directory: pruebas
-        timeout-minutes: 5
+        timeout-minutes: 2
         continue-on-error: true
         env:
           EXE_WS_ECO: ${{ github.workspace }}/build/pruebas/ws-eco_artefacts/Release/ws-eco
@@ -145,7 +154,7 @@ jobs:
         run: node humo.mjs
       - name: Prueba del puente con plugins VST3 de prueba
         working-directory: pruebas
-        timeout-minutes: 10
+        timeout-minutes: 3
         continue-on-error: true
         env:
           EXE_PUENTE: ${{ github.workspace }}/build/fuente/synz-puente_artefacts/Release/SYNZ Bridge.app/Contents/MacOS/SYNZ Bridge
