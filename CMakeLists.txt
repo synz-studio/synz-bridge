@@ -1,9 +1,11 @@
 cmake_minimum_required(VERSION 3.22)
+# macOS 11 como mínimo. Tiene que ir ANTES de project(): después CMake lo ignora y el programa sale pidiendo el macOS del SDK
+# con que se compila (30 oct–7 nov 2026: salió exigiendo macOS 26 y no abría en un Mac con otra versión).
+set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Versión mínima de macOS")
 project(synz_puente VERSION 1.0.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "")
 if(APPLE)
   enable_language(OBJC OBJCXX)
 endif()
