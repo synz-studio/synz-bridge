@@ -1,18 +1,14 @@
 cmake_minimum_required(VERSION 3.22)
-# macOS 10.13 como mínimo en Intel (la parte Apple Silicon no puede pedir menos de macOS 11: lo fija Apple y el compilador lo sube solo).
-# Tiene que ir ANTES de project(): después CMake lo ignora y el programa sale pidiendo el macOS del SDK con que se compila
-# (30 oct–7 nov 2026: salió exigiendo macOS 26 y no abría en un Mac con otra versión).
-set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Versión mínima de macOS")
+# macOS 10.15 (Catalina) como mínimo en Intel; la parte Apple Silicon no puede pedir menos de macOS 11 (lo fija Apple y el compilador
+# lo sube solo). Con 10.15 libc++ trae std::optional, std::filesystem, etc. sin trucos. Tiene que ir ANTES de project(): después CMake lo
+# ignora y el programa sale pidiendo el macOS del SDK con que se compila (30 oct–7 nov 2026: salió exigiendo macOS 26).
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Versión mínima de macOS")
 project(synz_puente VERSION 1.0.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(APPLE)
   enable_language(OBJC OBJCXX)
-endif()
-if(APPLE)
-  # Con un macOS mínimo anterior al 10.14 libc++ marca como «no disponibles» std::optional y compañía, aunque son solo cabeceras.
-  add_compile_definitions(_LIBCPP_DISABLE_AVAILABILITY)
 endif()
 
 # JUCE 8: sale de una copia local si se indica JUCE_DIR; si no, se descarga la versión fijada.
