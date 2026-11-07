@@ -126,7 +126,7 @@ jobs:
         timeout-minutes: 10
         run: |
           command -v ninja >/dev/null || brew install ninja
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13
       - name: Compilar el programa, el servidor eco y los plugins de prueba
         timeout-minutes: 70
         run: cmake --build build --config Release
@@ -167,12 +167,13 @@ jobs:
       - name: Programa universal (Intel y Apple Silicon), solo el programa
         timeout-minutes: 40
         run: |
-          cmake -S . -B build-uni -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DSYNZ_PUENTE_PRUEBAS=OFF
+          cmake -S . -B build-uni -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13 -DSYNZ_PUENTE_PRUEBAS=OFF
           cmake --build build-uni --config Release --target synz-puente
           lipo -info "build-uni/fuente/synz-puente_artefacts/Release/SYNZ Bridge.app/Contents/MacOS/SYNZ Bridge"
-          # El programa no puede exigir un macOS más nuevo que el 11 (si lo exige, en un Mac con otra versión no abre).
+          # El programa no puede exigir un macOS más nuevo que el 10.13 en Intel ni que el 11 en Apple Silicon (si lo exige, en un Mac con otra versión no abre).
           vtool -show-build "build-uni/fuente/synz-puente_artefacts/Release/SYNZ Bridge.app/Contents/MacOS/SYNZ Bridge" | tee vtool.txt
-          grep -c "minos 11.0" vtool.txt | grep -q "^2$" || { echo "FALLO: el programa no pide macOS 11 en sus dos arquitecturas"; exit 1; }
+          grep -c "minos 11.0" vtool.txt | grep -q "^1$" || { echo "FALLO: la parte Apple Silicon no pide macOS 11"; exit 1; }
+          grep -c "minos 10.13" vtool.txt | grep -q "^1$" || { echo "FALLO: la parte Intel no pide macOS 10.13"; exit 1; }
           plutil -p "build-uni/fuente/synz-puente_artefacts/Release/SYNZ Bridge.app/Contents/Info.plist" | tee plist.txt
           grep -q 'synz-bridge' plist.txt || { echo 'FALTA el esquema synz-bridge en el Info.plist'; exit 1; }
       - name: Empaquetar
