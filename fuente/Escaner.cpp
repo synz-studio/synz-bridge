@@ -1,4 +1,5 @@
 #include "Escaner.h"
+#include <algorithm>
 #include "Texto.h"
 #include <iostream>
 
@@ -173,6 +174,20 @@ void Escaner::run()
             pendientes.push_back ({ f->getName(), a });
     }
 
+    // Primero los VST3 y al final los AudioUnit: son los que más se usan en el estudio y los AU de algunas casas se quedan
+    // esperando a una licencia o a un permiso de macOS, así que no deben retrasar a los demás.
+    const auto rango = [] (const juce::String& formato) { return formato == "VST3" ? 0 : (formato == "AudioUnit" ? 2 : 1); };
+    std::stable_sort (pendientes.begin(), pendientes.end(), [&] (const Pendiente& x, const Pendiente& y) { return rango (x.formato) < rango (y.formato); });
+
+    // Fabricante de un AudioUnit (el tercer campo de «aufx,T503,Ikmm»); vacío si no es un AU.
+    const auto fabricanteAU = [] (const juce::File& f)
+    {
+        juce::StringArray campos;
+        campos.addTokens (f.getFileName(), ",", "");
+        return campos.size() == 3 ? campos[2] : juce::String();
+    };
+    std::map<juce::String, int> sinRespuestaSeguidos;       // por fabricante: AU seguidos que no respondieron a tiempo
+
     std::vector<PluginFallido> fallidos;
     std::map<juce::String, Entrada> nueva;
     std::vector<juce::PluginDescription> todos;
@@ -209,20 +224,40 @@ void Escaner::run()
         if (reutilizar)
             continue;
 
+        const auto fabricante = fabricanteAU (f);
+        if (fabricante.isNotEmpty() && sinRespuestaSeguidos[fabricante] >= 2)
+        {
+            // Dos seguidos de la misma casa sin responder: lo normal es que esperen a una licencia o a un permiso. Se dejan para
+            // la próxima vez (no entran en la lista negra) en vez de perder 30 s con cada uno.
+            fallidos.push_back ({ archivo, "se salta esta vez: los anteriores de su fabricante no respondieron"_es });
+            continue;
+        }
+
         Entrada entrada;
         entrada.modificado = mod;
         juce::String motivo;
         if (escanearUno (formato, archivo, entrada.plugins, motivo))
         {
+            if (fabricante.isNotEmpty())
+                sinRespuestaSeguidos[fabricante] = 0;
             todos.insert (todos.end(), entrada.plugins.begin(), entrada.plugins.end());
             nueva[clave] = std::move (entrada);
             std::lock_guard<std::mutex> g (m);
             listaNegra.erase (clave);
+            // Lo que ya se ha encontrado se puede usar sin esperar al final del escaneo (con muchos plugins, tarda).
+            for (auto& d : todos)
+            {
+                const bool ya = std::any_of (actuales.begin(), actuales.end(), [&] (const juce::PluginDescription& x) { return x.isDuplicateOf (d); });
+                if (! ya)
+                    actuales.push_back (d);
+            }
         }
         else
         {
             registro.escribir ("Escaneo: " + f.getFileName() + ": " + motivo);
             fallidos.push_back ({ archivo, motivo });
+            if (fabricante.isNotEmpty() && motivo.contains ("tardó más"))
+                ++sinRespuestaSeguidos[fabricante];
             std::lock_guard<std::mutex> g (m);
             listaNegra[clave] = mod;
         }
