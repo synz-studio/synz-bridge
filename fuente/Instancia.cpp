@@ -124,6 +124,10 @@ private:
     bool colocando = false;
 };
 
+#if JUCE_MAC
+void synzMacPonerDelante (void* vistaNativa);       // VentanaMac.mm
+#endif
+
 class Instancia::VentanaEditor : public juce::DocumentWindow
 {
 public:
@@ -174,6 +178,10 @@ public:
         juce::Process::makeForegroundProcess();      // sin esto, un programa en segundo plano no se pone delante en macOS
        #endif
         toFront (true);
+       #if JUCE_MAC
+        if (auto* peer = getPeer())
+            synzMacPonerDelante (peer->getNativeHandle());   // sale en el escritorio donde esté el usuario, también sobre un navegador a pantalla completa
+       #endif
        #if JUCE_WINDOWS
         if (auto* peer = getPeer())
         {

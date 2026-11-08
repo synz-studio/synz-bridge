@@ -20,6 +20,7 @@ target_sources(synz-puente PRIVATE
 target_include_directories(synz-puente PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${SYNZ_WS_INCLUDE})
 
 if(APPLE)
+  target_sources(synz-puente PRIVATE VentanaMac.mm)
   set(SYNZ_PLUGINHOST_AU 1)
 else()
   set(SYNZ_PLUGINHOST_AU 0)
