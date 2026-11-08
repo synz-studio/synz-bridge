@@ -317,12 +317,13 @@ int escanearArchivoYEscribir (const juce::String& nombreFormato, const juce::Str
             {
                 const char* crudo = ::dlerror();
                 const auto e = juce::String::fromUTF8 (crudo != nullptr ? crudo : "motivo desconocido");
-                if (e.contains ("have 'x86_64', need 'arm64'"))
+                // El texto de macOS: «… incompatible architecture (have 'x86_64', need 'arm64e' or 'arm64')». Se saca lo que importa.
+                if (e.contains ("incompatible architecture") && e.contains ("have 'x86_64'") && e.contains ("need 'arm64"))
                     motivoReal = "es solo para Intel y este Mac es Apple Silicon: necesita una versión nueva del plugin (o abrir SYNZ Bridge con Rosetta)"_es;
-                else if (e.contains ("have 'arm64', need 'x86_64'"))
+                else if (e.contains ("incompatible architecture") && e.contains ("have 'arm64") && e.contains ("need 'x86_64'"))
                     motivoReal = "es solo para Apple Silicon y SYNZ Bridge está abierto con Rosetta (como Intel)"_es;
                 else
-                    motivoReal = "macOS no lo carga: "_es + e;
+                    motivoReal = "macOS no lo carga: "_es + e.substring (0, 240);
             }
         }
         else
