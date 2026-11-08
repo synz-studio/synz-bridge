@@ -182,4 +182,20 @@ private:
     std::unique_ptr<synz::IconoBandeja> bandeja;
 };
 
+#if JUCE_MAC
+// En macOS cada hijo del escáner (--escanear-uno, uno por plugin) es un proceso del mismo paquete y, sin esto, sale en el Dock y «bota»
+// una vez por plugin (con cientos de plugins, un bucle de botes). Se oculta del Dock antes de que arranque nada. Es lo que hace Projucer
+// en su modo de línea de órdenes. Lo demás es lo mismo que START_JUCE_APPLICATION.
+JUCE_CREATE_APPLICATION_DEFINE (AppPuente)
+
+int main (int argc, char* argv[])
+{
+    if (argc >= 2 && juce::String (argv[1]) == "--escanear-uno")
+        juce::Process::setDockIconVisible (false);
+
+    juce::JUCEApplicationBase::createInstance = &juce_CreateApplication;
+    return juce::JUCEApplicationBase::main (argc, (const char**) argv);
+}
+#else
 START_JUCE_APPLICATION (AppPuente)
+#endif
