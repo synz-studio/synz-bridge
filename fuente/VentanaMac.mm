@@ -16,10 +16,13 @@ extern "C" void synzMacPonerDelante (void* vistaNativa, char* texto, int tamano)
         return;
     }
 
-    // Aparece en el escritorio (o pantalla completa) donde esté el usuario, no en el escritorio donde nació el programa.
-    [ventana setCollectionBehavior: ([ventana collectionBehavior]
-                                     | NSWindowCollectionBehaviorCanJoinAllSpaces
-                                     | NSWindowCollectionBehaviorFullScreenAuxiliary)];
+    // «Se mueve al escritorio activo» cada vez que se pone delante: sale donde está el usuario (incluido Chrome a pantalla completa) y no en el
+    // escritorio donde nació. macOS solo lo aplica al volver a mostrarla, por eso se oculta un instante y se vuelve a poner.
+    NSWindowCollectionBehavior c = [ventana collectionBehavior];
+    c &= ~(NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehaviorMoveToActiveSpace);
+    c |= (NSWindowCollectionBehaviorMoveToActiveSpace | NSWindowCollectionBehaviorFullScreenAuxiliary);
+    [ventana orderOut: nil];
+    [ventana setCollectionBehavior: c];
     [ventana setLevel: NSFloatingWindowLevel];
     [ventana setHidesOnDeactivate: NO];
     [NSApp activateIgnoringOtherApps: YES];
