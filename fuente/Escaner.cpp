@@ -315,8 +315,14 @@ int escanearArchivoYEscribir (const juce::String& nombreFormato, const juce::Str
             }
             else
             {
-                const char* e = ::dlerror();
-                motivoReal = "macOS no lo carga: "_es + juce::String::fromUTF8 (e != nullptr ? e : "motivo desconocido");
+                const char* crudo = ::dlerror();
+                const auto e = juce::String::fromUTF8 (crudo != nullptr ? crudo : "motivo desconocido");
+                if (e.contains ("have 'x86_64', need 'arm64'"))
+                    motivoReal = "es solo para Intel y este Mac es Apple Silicon: necesita una versión nueva del plugin (o abrir SYNZ Bridge con Rosetta)"_es;
+                else if (e.contains ("have 'arm64', need 'x86_64'"))
+                    motivoReal = "es solo para Apple Silicon y SYNZ Bridge está abierto con Rosetta (como Intel)"_es;
+                else
+                    motivoReal = "macOS no lo carga: "_es + e;
             }
         }
         else
