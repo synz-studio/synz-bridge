@@ -47,7 +47,12 @@ public:
 
         synz::Puente::Opciones o;
         o.programa = juce::File::getSpecialLocation (juce::File::currentExecutableFile);
+       #if JUCE_MAC
+        // En macOS JUCE da ~/Library (no ~/Library/Application Support) como «datos de aplicación del usuario».
+        o.carpetaDatos = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory).getChildFile ("Application Support/SYNZ Bridge");
+       #else
         o.carpetaDatos = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory).getChildFile ("SYNZ Bridge");
+       #endif
         bool sinVentana = false, cerrarConEntrada = false, enSegundoPlano = false, abiertoPorEnlace = false;
 
         for (int i = 0; i < args.size(); ++i)
