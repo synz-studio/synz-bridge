@@ -472,6 +472,9 @@ juce::var Puente::operacion (ConexionControl& c, const juce::var& p)
                 registro().escribir ("Un plugin no pudo crear su ventana (instancia "_es + juce::String (id) + ")"_es);
                 return errorVar ("fallo_plugin", "el plugin no pudo crear su ventana");
             }
+           #if JUCE_MAC
+            registro().escribir ("Ventana de plugin (instancia "_es + juce::String (id) + "): "_es + estadoVentanaMac());
+           #endif
             return okVar();
         });
     }

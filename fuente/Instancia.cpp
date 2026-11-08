@@ -125,7 +125,8 @@ private:
 };
 
 #if JUCE_MAC
-extern "C" void synzMacPonerDelante (void* vistaNativa);       // VentanaMac.mm
+juce::String& estadoVentanaMac() { static juce::String texto; return texto; }     // solo el hilo de mensajes
+extern "C" void synzMacPonerDelante (void* vistaNativa, char* texto, int tamano);       // VentanaMac.mm
 #endif
 
 class Instancia::VentanaEditor : public juce::DocumentWindow
@@ -180,7 +181,11 @@ public:
         toFront (true);
        #if JUCE_MAC
         if (auto* peer = getPeer())
-            synzMacPonerDelante (peer->getNativeHandle());   // sale en el escritorio donde esté el usuario, también sobre un navegador a pantalla completa
+        {
+            char estado[400];
+            synzMacPonerDelante (peer->getNativeHandle(), estado, (int) sizeof (estado));   // sale en el escritorio donde esté el usuario, también sobre un navegador a pantalla completa
+            estadoVentanaMac() = juce::String (estado);
+        }
        #endif
        #if JUCE_WINDOWS
         if (auto* peer = getPeer())

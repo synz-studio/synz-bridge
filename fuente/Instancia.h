@@ -19,6 +19,11 @@ constexpr int maxCanales = 8;
 constexpr int maxBloque  = 2048;
 constexpr int maxMidiPorBloque = 256;
 
+#if JUCE_MAC
+/** Cómo quedó la última ventana de plugin al ponerla delante (para el registro). Solo el hilo de mensajes. */
+juce::String& estadoVentanaMac();
+#endif
+
 class Instancia : private juce::AudioProcessorParameter::Listener
 {
 public:
