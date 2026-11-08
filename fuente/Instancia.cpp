@@ -125,7 +125,7 @@ private:
 };
 
 #if JUCE_MAC
-void synzMacPonerDelante (void* vistaNativa);       // VentanaMac.mm
+extern "C" void synzMacPonerDelante (void* vistaNativa);       // VentanaMac.mm
 #endif
 
 class Instancia::VentanaEditor : public juce::DocumentWindow
