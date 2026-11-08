@@ -1,4 +1,7 @@
 #include "Escaner.h"
+#if JUCE_MAC
+ #include <dlfcn.h>
+#endif
 #include <algorithm>
 #include "Texto.h"
 #include <iostream>
@@ -294,6 +297,33 @@ int escanearArchivoYEscribir (const juce::String& nombreFormato, const juce::Str
     juce::OwnedArray<juce::PluginDescription> descripciones;
     formato->findAllTypesForFile (descripciones, archivo);
 
+   #if JUCE_MAC
+    // Si JUCE no encuentra ningún plugin en un paquete, el motivo real casi nunca sale en su mensaje. Se intenta cargar el binario a pelo
+    // y se cuenta qué dice macOS (arquitectura equivocada, firma, una biblioteca que falta…). Sirve para que el usuario sepa por qué.
+    juce::String motivoReal;
+    if (descripciones.isEmpty() && nombreFormato == "VST3")
+    {
+        juce::File binario;
+        for (auto& f : juce::File (archivo).getChildFile ("Contents/MacOS").findChildFiles (juce::File::findFiles, false))
+            { binario = f; break; }
+        if (binario.existsAsFile())
+        {
+            if (void* h = ::dlopen (binario.getFullPathName().toRawUTF8(), RTLD_LAZY | RTLD_LOCAL))
+            {
+                motivoReal = "el binario se carga, pero no ofrece ningún plugin VST3 (¿pide una licencia o un host concreto?)"_es;
+                ::dlclose (h);
+            }
+            else
+            {
+                const char* e = ::dlerror();
+                motivoReal = "macOS no lo carga: "_es + juce::String::fromUTF8 (e != nullptr ? e : "motivo desconocido");
+            }
+        }
+        else
+            motivoReal = "no tiene binario en Contents/MacOS"_es;
+    }
+   #endif
+
     // JUCE saca la descripción de un VST3 de su `moduleinfo.json` sin crear el plugin. Aquí SÍ se crea y se prepara,
     // en este proceso aparte: un plugin que se cae al cargarse mata a este hijo y no al puente, y lo que se devuelve
     // ya lleva los canales reales.
@@ -321,6 +351,10 @@ int escanearArchivoYEscribir (const juce::String& nombreFormato, const juce::Str
         copia.isInstrument = real.isInstrument;
         raiz.addChildElement (copia.createXml().release());
     }
+   #if JUCE_MAC
+    if (raiz.getNumChildElements() == 0 && fallo.isEmpty() && motivoReal.isNotEmpty())
+        fallo = motivoReal;
+   #endif
     if (raiz.getNumChildElements() == 0 && fallo.isNotEmpty())
         raiz.setAttribute ("fallo", fallo);
 
