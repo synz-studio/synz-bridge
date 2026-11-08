@@ -30,6 +30,10 @@ WsConexion::~WsConexion()
 void WsConexion::cortar()
 {
     viva = false;
+    // Solo un hilo cierra el socket: `StreamingSocket::close()` no aguanta dos llamadas a la vez (libera la misma memoria dos veces
+    // y macOS aborta el programa). Pasaba al descargar un plugin a la vez que la conexión de audio se cortaba sola.
+    if (cortada.exchange (true))
+        return;
     if (socket != nullptr)
         socket->close();
 }

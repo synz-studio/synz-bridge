@@ -49,6 +49,7 @@ private:
     std::unique_ptr<juce::StreamingSocket> socket;
     const size_t cargaMaxima;
     std::atomic<bool> viva { true };
+    std::atomic<bool> cortada { false };
     std::mutex escritura;
     bool cierreEnviado = false;
     std::vector<uint8_t> trama;     // carga de la trama en curso
