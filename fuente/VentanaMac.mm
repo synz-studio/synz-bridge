@@ -16,11 +16,11 @@ extern "C" void synzMacPonerDelante (void* vistaNativa, char* texto, int tamano)
         return;
     }
 
-    // «Se mueve al escritorio activo» cada vez que se pone delante: sale donde está el usuario (incluido Chrome a pantalla completa) y no en el
-    // escritorio donde nació. macOS solo lo aplica al volver a mostrarla, por eso se oculta un instante y se vuelve a poner.
+    // En todos los escritorios, también sobre un navegador a pantalla completa (necesita que el programa no tenga icono en el Dock: ver Main.cpp).
+    // macOS solo lo aplica al volver a mostrarla, por eso se oculta un instante y se vuelve a poner.
     NSWindowCollectionBehavior c = [ventana collectionBehavior];
     c &= ~(NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehaviorMoveToActiveSpace);
-    c |= (NSWindowCollectionBehaviorMoveToActiveSpace | NSWindowCollectionBehaviorFullScreenAuxiliary);
+    c |= (NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehaviorFullScreenAuxiliary);
     [ventana orderOut: nil];
     [ventana setCollectionBehavior: c];
     [ventana setLevel: NSFloatingWindowLevel];

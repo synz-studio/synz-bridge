@@ -125,6 +125,12 @@ public:
            #if JUCE_WINDOWS || JUCE_MAC
             bandeja = std::make_unique<synz::IconoBandeja> (o.programa, [this] { ensenaVentana(); }, [this] { quit(); });
            #endif
+           #if JUCE_MAC
+            // Con icono en la barra de menús y sin icono en el Dock, macOS lo trata como un programa de barra de menús: sus ventanas pueden
+            // ponerse delante de un navegador a pantalla completa (un programa normal no puede entrar en ese escritorio).
+            if (bandeja != nullptr)
+                juce::Process::setDockIconVisible (false);
+           #endif
             if (! enSegundoPlano || bandeja == nullptr)       // sin bandeja (Linux) no habría forma de abrirlo: se enseña la ventana
             {
                 ensenaVentana();

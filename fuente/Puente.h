@@ -13,7 +13,7 @@
 namespace synz
 {
 constexpr int versionProtocolo = 1;
-constexpr const char* versionPuente = "1.2.3";   // 1.1.0: escalarEditor, capturarEditor, ventana de SYNZ, `capacidades` e `instancias` en «hola»
+constexpr const char* versionPuente = "1.2.4";   // 1.1.0: escalarEditor, capturarEditor, ventana de SYNZ, `capacidades` e `instancias` en «hola»
 constexpr int puertoPorDefecto = 47821;
 
 class Puente : public WsOyente, private juce::Timer

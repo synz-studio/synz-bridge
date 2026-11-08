@@ -175,9 +175,6 @@ public:
     void alFrente()
     {
         setAlwaysOnTop (true);
-       #if JUCE_MAC
-        juce::Process::makeForegroundProcess();      // sin esto, un programa en segundo plano no se pone delante en macOS
-       #endif
         toFront (true);
        #if JUCE_MAC
         if (auto* peer = getPeer())
