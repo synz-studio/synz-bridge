@@ -5,6 +5,7 @@
 #include "Escaner.h"
 #include "Instancia.h"
 #include "Registro.h"
+#include "SensoresOsc.h"
 #include "ws/WsServidor.h"
 #include <atomic>
 #include <map>
@@ -13,8 +14,9 @@
 namespace synz
 {
 constexpr int versionProtocolo = 1;
-constexpr const char* versionPuente = "1.2.4";   // 1.1.0: escalarEditor, capturarEditor, ventana de SYNZ, `capacidades` e `instancias` en «hola»
+constexpr const char* versionPuente = "1.3.0";   // 1.1.0: escalarEditor, capturarEditor, ventana de SYNZ, `capacidades` e `instancias` en «hola»; 1.3.0: sensores por OSC (/sensores)
 constexpr int puertoPorDefecto = 47821;
+constexpr int puertoOscPorDefecto = 9000;   // OSC (UDP) para los sensores del estudio
 
 class Puente : public WsOyente, private juce::Timer
 {
@@ -28,6 +30,8 @@ public:
         juce::StringArray carpetasTemporales;    // carpetas de plugins extra, solo esta ejecución
         bool preguntar = true;                   // pedir permiso al usuario para los orígenes nuevos
         int plazoEscaneoMs = 30000;
+        int puertoOsc = puertoOscPorDefecto;    // -1 = sin OSC; 0 = que lo elija el sistema (pruebas)
+        bool oscRed = false;                     // OSC también desde otros aparatos de la red (TouchOSC en una tableta)
     };
 
     explicit Puente (Opciones);
@@ -36,6 +40,7 @@ public:
     /** Hilo de mensajes. Devuelve false si no se pudo abrir el puerto. */
     bool iniciar();
     int puerto() const { return servidor.puerto(); }
+    int puertoOsc() const { return osc.puerto(); }
 
     Registro& registro() { return log; }
     Config& ajustes() { return config; }
@@ -44,6 +49,8 @@ public:
     {
         int conexiones = 0, instancias = 0, plugins = 0;
         bool escaneando = false;
+        int oscPuerto = -1, oscSensores = 0, oscConexiones = 0;
+        bool oscRed = false;
     };
     Resumen resumen() const;
     void reescanear (bool forzar) { escaner.iniciar (forzar); }
@@ -70,6 +77,7 @@ private:
 
     void atenderControl (std::shared_ptr<WsConexion>, const SolicitudWs&);
     void atenderAudio (std::shared_ptr<WsConexion>, const SolicitudWs&);
+    void atenderSensores (std::shared_ptr<WsConexion>, const SolicitudWs&);
 
     juce::var operacion (ConexionControl& c, const juce::var& peticion);   // devuelve el objeto de respuesta sin el id
     juce::var opCrear (ConexionControl& c, const juce::var& p);
@@ -87,6 +95,7 @@ private:
     Registro log;
     juce::AudioPluginFormatManager formatos;
     Escaner escaner;
+    SensoresOsc osc;     // antes que el servidor: las conexiones de /sensores lo usan
     WsServidor servidor;
 
     mutable std::mutex mutexControl;

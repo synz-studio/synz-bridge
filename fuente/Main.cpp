@@ -13,6 +13,8 @@
 //   synz-bridge://…          lo que recibe cuando el estudio lo abre: arranca en segundo plano y, si ya había uno abierto, no dice nada
 //   --sin-preguntar          los orígenes que no estén en la lista se rechazan sin preguntar
 //   --plazo-escaneo-ms N     plazo máximo para mirar cada plugin
+//   --puerto-osc N           puerto UDP del OSC para los sensores del estudio (9000 por defecto; -1 = sin OSC; 0 = que lo elija el sistema)
+//   --osc-red                el OSC escucha en toda la red, no solo en este ordenador (TouchOSC desde una tableta)
 //   --cerrar-con-entrada     se cierra cuando se cierra su entrada estándar (lo usan las pruebas)
 // Uso interno: --escanear-uno FORMATO ARCHIVO (lo lanza el propio programa para mirar un plugin en un proceso aparte).
 #include "Escaner.h"
@@ -85,6 +87,8 @@ public:
             }
             else if (a == "--sin-preguntar")      o.preguntar = false;
             else if (a == "--plazo-escaneo-ms")   o.plazoEscaneoMs = sig().getIntValue();
+            else if (a == "--puerto-osc")         o.puertoOsc = sig().getIntValue();
+            else if (a == "--osc-red")            o.oscRed = true;
             else if (a == "--cerrar-con-entrada") cerrarConEntrada = true;
         }
 
@@ -116,6 +120,7 @@ public:
         }
 
         std::cout << "LISTO " << puente->puerto() << std::endl;
+        std::cout << "OSC " << puente->puertoOsc() << std::endl;   // -1 si no se pudo abrir
         if (cerrarConEntrada)
             std::thread ([] { char c; while (std::cin.get (c)) {} juce::MessageManager::callAsync ([] { if (auto* a = juce::JUCEApplicationBase::getInstance()) a->systemRequestedQuit(); }); }).detach();
         if (! sinVentana)

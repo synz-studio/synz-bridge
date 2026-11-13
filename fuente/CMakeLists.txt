@@ -15,6 +15,7 @@ target_sources(synz-puente PRIVATE
   Puente.cpp
   Instancia.cpp
   Escaner.cpp
+  SensoresOsc.cpp
   ${SYNZ_WS_FUENTES})
 
 target_include_directories(synz-puente PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${SYNZ_WS_INCLUDE})
@@ -42,6 +43,7 @@ target_link_libraries(synz-puente PRIVATE
   juce::juce_audio_processors
   juce::juce_gui_basics
   juce::juce_events
+  juce::juce_osc
   juce::juce_core
   juce::juce_recommended_config_flags
   juce::juce_recommended_warning_flags)

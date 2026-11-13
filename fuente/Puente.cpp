@@ -79,6 +79,7 @@ Puente::Puente (Opciones o)
       config (opciones.carpetaDatos),
       log (config.archivoRegistro()),
       escaner (config, log, formatos, opciones.programa),
+      osc (log),
       servidor (*this)
 {
     escaner.plazoMs = opciones.plazoEscaneoMs;
@@ -112,6 +113,8 @@ bool Puente::iniciar()
         return false;
     }
     log.escribir ("Escuchando en 127.0.0.1:" + juce::String (servidor.puerto()));
+    if (opciones.puertoOsc >= 0)
+        osc.iniciar (opciones.puertoOsc, opciones.oscRed || config.oscRed());   // si el puerto está ocupado, el puente sigue sin OSC
     escaner.iniciar (false);
     startTimer (33);
     return true;
@@ -129,6 +132,7 @@ void Puente::detener()
 
     // Las conexiones pueden estar esperando al hilo de mensajes (crear, abrir editor…): mientras se paran,
     // se sigue atendiendo ese hilo para que no se bloqueen unas a otras.
+    osc.detener();       // cierra también las conexiones de /sensores, que si no esperarían a su cliente
     std::atomic<bool> parado { false };
     std::thread parador ([&] { servidor.parar(); parado = true; });
     while (! parado.load())
@@ -160,6 +164,10 @@ Puente::Resumen Puente::resumen() const
     }
     r.plugins = (int) escaner.lista().size();
     r.escaneando = escaner.escaneando();
+    r.oscPuerto = osc.puerto();
+    r.oscRed = osc.enRed();
+    r.oscSensores = osc.sensores();
+    r.oscConexiones = osc.conexiones();
     return r;
 }
 
@@ -251,7 +259,7 @@ bool Puente::origenPermitido (const juce::String& origen)
 
 bool Puente::rutaValida (const juce::String& ruta)
 {
-    return ruta == "/control" || ruta.startsWith ("/audio/");
+    return ruta == "/control" || ruta == "/sensores" || ruta.startsWith ("/audio/");
 }
 
 bool Puente::prioridadAlta (const SolicitudWs& s)
@@ -268,8 +276,30 @@ void Puente::atender (std::shared_ptr<WsConexion> conexion, const SolicitudWs& s
 {
     if (solicitud.ruta == "/control")
         atenderControl (std::move (conexion), solicitud);
+    else if (solicitud.ruta == "/sensores")
+        atenderSensores (std::move (conexion), solicitud);
     else
         atenderAudio (std::move (conexion), solicitud);
+}
+
+//==============================================================================
+// Sensores (PROTOCOLO.md §7): el puente manda; lo que llegue del estudio (su saludo) se lee y se descarta
+void Puente::atenderSensores (std::shared_ptr<WsConexion> ws, const SolicitudWs& solicitud)
+{
+    log.escribir ("Sensores OSC: conectado "_es + solicitud.origen);
+    osc.agregar (ws);
+    notificarCambio();
+    std::vector<uint8_t> datos;
+    bool texto = false;
+    while (ws->abierta())
+    {
+        const auto r = ws->leer (datos, texto, 1000);
+        if (r == WsConexion::Resultado::TiempoAgotado || r == WsConexion::Resultado::Mensaje)
+            continue;
+        break;
+    }
+    osc.quitar (ws);
+    notificarCambio();
 }
 
 //==============================================================================
@@ -393,9 +423,10 @@ juce::var Puente::operacion (ConexionControl& c, const juce::var& p)
             o->setProperty ("instancias", (int) instancias.size());
         }
         juce::Array<juce::var> caps;
-        for (auto c : { "capturarEditor", "escalarEditor", "ventanaSynz" })
+        for (auto c : { "capturarEditor", "escalarEditor", "ventanaSynz", "sensoresOsc" })
             caps.add (c);
-        o->setProperty ("capacidades", caps);       // lo que sabe hacer este puente: el estudio avisa si le falta algo que usa
+        o->setProperty ("capacidades", caps);
+        o->setProperty ("osc", osc.puerto());       // el puerto UDP de los sensores (-1 si no está abierto)       // lo que sabe hacer este puente: el estudio avisa si le falta algo que usa
         return r;
     }
 

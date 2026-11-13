@@ -9,7 +9,8 @@
     "todo": "node --test",
     "cliente": "node --test cliente.test.mjs",
     "sincronia": "node --test sincronia.test.mjs",
-    "estudio": "node --test estudio.test.mjs"
+    "estudio": "node --test estudio.test.mjs",
+    "sensores": "node --test sensores.test.mjs"
   },
   "devDependencies": {
     "ws": "8.18.0",
