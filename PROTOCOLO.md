@@ -123,3 +123,36 @@ Los eventos van ordenados por `desplazamiento`; si no, el puente los ordena.
 - `latencia del plugin`: campo `latencia` de la respuesta.
 
 El estudio usa esa suma para compensar los retardos (PDC) y para colocar bien lo que se graba.
+
+## 5. Sensores por OSC: `/sensores` (desde la 1.3.0)
+
+Para los sensores del estudio (`docs/guidelines/sensores.md`, fase 3). El puente escucha **OSC por UDP** en el puerto 9000
+(`--puerto-osc N`; `-1` = sin OSC; `0` = que lo elija el sistema) y lo pasa al estudio por la ruta WebSocket `/sensores`.
+Por defecto el UDP solo escucha en `127.0.0.1`; con `--osc-red` (o `"oscRed": true` en `config.json`), en todas las
+interfaces, para que TouchOSC u otro aparato de la misma red mande al ordenador. La ruta `/sensores` pide un origen
+permitido, como `/control`. Al arrancar, después de `LISTO <puerto>`, el puente escribe `OSC <puerto>` (`-1` si no lo abrió),
+y `hola` lleva `"osc": <puerto>` y la capacidad `sensoresOsc`.
+
+Direcciones OSC (argumentos `i` o `f`; lo demás se ignora; los bundles se abren):
+
+| Dirección | Qué hace |
+|---|---|
+| `/synz/sensor/<id>/<salida> v` | el valor de una salida de un sensor |
+| `/synz/sensor/<id> v1 v2 …` | varias salidas a la vez, por orden (`s1`, `s2`…) |
+| `/synz/rango/<id>/<salida> min max` | el rango de esa salida (el estudio lo pasa a 0..1); sin él, se espera 0..1 |
+| cualquier otra, p. ej. `/1/fader1 v` | va al sensor `osc`: una salida por dirección (y por argumento: `accxyz-1`, `-2`…), por orden de llegada |
+
+Los ids y las salidas se limpian a `a-z`, `0-9`, `-` y `_` (32 y 24 caracteres). Hasta 8 sensores y 8 salidas por sensor;
+4 conexiones a `/sensores` a la vez.
+
+Lo que manda el puente por `/sensores` es el JSON de un programa del laboratorio (el mismo que la fase 2), en **una lista por
+mensaje**, como mucho cada 8 ms, solo con lo que cambió:
+
+```json
+[{ "synz": "sensor", "id": "lab-flex", "nombre": { "es": "lab-flex", "en": "lab-flex" },
+   "salidas": [{ "id": "indice", "l": "indic", "min": 0, "max": 1, "h": { "es": "OSC: /synz/sensor/lab-flex/indice", "en": "…" } }] },
+ { "id": "lab-flex", "v": { "indice": 0.25 } }]
+```
+
+El alta se repite cuando un sensor gana una salida o un rango, y para todos cuando se conecta alguien nuevo. Lo que mande el
+estudio por esta ruta se lee y se descarta.

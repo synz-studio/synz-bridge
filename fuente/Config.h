@@ -1,5 +1,5 @@
 // Ajustes del usuario que se guardan entre sesiones, en la carpeta de datos del programa.
-//   config.json          orígenes que se aceptaron «para siempre» y carpetas de plugins añadidas
+//   config.json          orígenes que se aceptaron «para siempre», carpetas de plugins añadidas y "oscRed" (OSC desde la red)
 //   cache-plugins.xml    qué plugins hay y de cuándo es cada archivo (para no volver a mirarlos)
 //   lista-negra.xml      plugins que colgaron o se cayeron al escanearlos
 //   puente.log           registro de lo que ha pasado
@@ -45,6 +45,12 @@ public:
         return carpetas;
     }
 
+    bool oscRed() const
+    {
+        std::lock_guard<std::mutex> g (m);
+        return osc;
+    }
+
     void agregarCarpeta (const juce::String& ruta)
     {
         {
@@ -68,6 +74,7 @@ private:
                 for (auto& x : *a) guardados.addIfNotAlreadyThere (x.toString());
             if (auto* a = o->getProperty ("carpetas").getArray())
                 for (auto& x : *a) carpetas.addIfNotAlreadyThere (x.toString());
+            osc = (bool) o->getProperty ("oscRed");
         }
     }
 
@@ -82,11 +89,16 @@ private:
         }
         o->setProperty ("origenes", a);
         o->setProperty ("carpetas", c);
+        {
+            std::lock_guard<std::mutex> g (m);
+            if (osc) o->setProperty ("oscRed", true);
+        }
         carpeta.getChildFile ("config.json").replaceWithText (juce::JSON::toString (juce::var (o)));
     }
 
     const juce::File carpeta;
     mutable std::mutex m;
     juce::StringArray guardados, carpetas;
+    bool osc = false;
 };
 } // namespace synz

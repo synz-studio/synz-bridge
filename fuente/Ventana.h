@@ -75,6 +75,8 @@ public:
         t << "Escuchando en 127.0.0.1:" << puente.puerto() << "   ·   "_es << r.plugins << " plugins"
           << (r.escaneando ? " (buscando…)"_es : "") << "   ·   "_es << r.conexiones << (r.conexiones == 1 ? " web conectada" : " webs conectadas")
           << "   ·   "_es << r.instancias << " abiertos";
+        if (r.oscPuerto >= 0)
+            t << "   ·   OSC "_es << (r.oscRed ? "red" : "local") << ":" << r.oscPuerto << " (" << r.oscSensores << " sensores)";
         estado.setText (t, juce::dontSendNotification);
     }
 
