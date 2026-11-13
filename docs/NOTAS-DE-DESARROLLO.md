@@ -55,7 +55,7 @@ Con `-DSYNZ_PUENTE_PRUEBAS=OFF` no se compilan los plugins de prueba.
 
 ## Usar
 
-    "SYNZ Bridge" [--puerto N] [--permitir-origen https://…] [--carpeta-plugins RUTA] [--sin-ventana] [--sin-preguntar]
+    "SYNZ Bridge" [--puerto N] [--puerto-osc N] [--osc-red] [--permitir-origen https://…] [--carpeta-plugins RUTA] [--sin-ventana] [--sin-preguntar]
 
 Al arrancar escribe `LISTO <puerto>` (puerto 47821 por defecto). Desde el navegador:
 
@@ -71,6 +71,13 @@ inst.latenciaMuestras();                              // ya coincide con lo medi
 inst.abrirEditor();                                   // ventana propia del plugin
 inst.dispose();                                       // suelta el plugin, el Worker y el canal de audio
 ```
+
+## Sensores por OSC (desde la 1.3.0)
+
+Además de los plugins, el puente recibe **OSC por UDP** (puerto 9000) y lo pasa al estudio como sensores de SONOLAB (ruta
+`/sensores`): Max, Pure Data, SuperCollider, TouchOSC, Python… En el estudio, objeto sensor → enchufe → `osc`. Por defecto
+solo escucha a este ordenador; `--osc-red` lo abre a la red (TouchOSC en una tableta) y `--puerto-osc N` cambia el puerto
+(`-1` lo apaga). Detalle en `PROTOCOLO.md` §5 y en `docs/guidelines/sensores.md`. Prueba: `sensores.test.mjs`.
 
 ## Seguridad
 
