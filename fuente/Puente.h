@@ -2,6 +2,7 @@
 // instancias de plugin y decide qué orígenes web pueden usar los plugins del ordenador.
 #pragma once
 #include "Config.h"
+#include "Entrada.h"
 #include "Escaner.h"
 #include "Instancia.h"
 #include "Registro.h"
@@ -14,7 +15,7 @@
 namespace synz
 {
 constexpr int versionProtocolo = 1;
-constexpr const char* versionPuente = "1.3.0";   // 1.1.0: escalarEditor, capturarEditor, ventana de SYNZ, `capacidades` e `instancias` en «hola»; 1.3.0: sensores por OSC (/sensores)
+constexpr const char* versionPuente = "1.4.0";   // 1.1.0: escalarEditor, capturarEditor, ventana de SYNZ, `capacidades` e `instancias` en «hola»; 1.3.0: sensores por OSC (/sensores); 1.4.0: entradas de la tarjeta (`dispositivos`, `abrirEntrada`)
 constexpr int puertoPorDefecto = 47821;
 constexpr int puertoOscPorDefecto = 9000;   // OSC (UDP) para los sensores del estudio
 
@@ -32,6 +33,7 @@ public:
         int plazoEscaneoMs = 30000;
         int puertoOsc = puertoOscPorDefecto;    // -1 = sin OSC; 0 = que lo elija el sistema (pruebas)
         bool oscRed = false;                     // OSC también desde otros aparatos de la red (TouchOSC en una tableta)
+        bool entradaPrueba = false;              // ofrece el dispositivo de entrada «Prueba» (32 tonos, sin tarjeta; solo pruebas)
     };
 
     explicit Puente (Opciones);
@@ -77,10 +79,13 @@ private:
 
     void atenderControl (std::shared_ptr<WsConexion>, const SolicitudWs&);
     void atenderAudio (std::shared_ptr<WsConexion>, const SolicitudWs&);
+    void atenderAudioEntrada (std::shared_ptr<WsConexion>, const SolicitudWs&, std::shared_ptr<Entrada>);
     void atenderSensores (std::shared_ptr<WsConexion>, const SolicitudWs&);
 
     juce::var operacion (ConexionControl& c, const juce::var& peticion);   // devuelve el objeto de respuesta sin el id
     juce::var opCrear (ConexionControl& c, const juce::var& p);
+    juce::var opAbrirEntrada (ConexionControl& c, const juce::var& p);
+    void cerrarEntrada (int id);                        // hilo de mensajes
     std::shared_ptr<Instancia> instanciaDe (const ConexionControl& c, const juce::var& p);
 
     void destruirInstancia (int id);                    // hilo de mensajes
@@ -107,6 +112,7 @@ private:
     mutable std::mutex mutexInstancias;
     std::map<int, std::shared_ptr<Instancia>> instancias;
     std::map<int, std::shared_ptr<WsConexion>> audios;
+    std::map<int, std::shared_ptr<Entrada>> entradas;   // las tarjetas abiertas; comparten los ids y los canales /audio con los plugins
     int siguienteInstancia = 1;
 
     // Permiso de orígenes

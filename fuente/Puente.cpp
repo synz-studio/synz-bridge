@@ -140,15 +140,21 @@ void Puente::detener()
     parador.join();
 
     std::vector<std::shared_ptr<Instancia>> restantes;
+    std::vector<std::shared_ptr<Entrada>> tarjetas;
     {
         std::lock_guard<std::mutex> g (mutexInstancias);
         for (auto& [id, inst] : instancias)
             restantes.push_back (inst);
+        for (auto& [id, e] : entradas)
+            tarjetas.push_back (e);
         instancias.clear();
+        entradas.clear();
         audios.clear();
     }
     for (auto& i : restantes)
         i->liberar();
+    for (auto& e : tarjetas)
+        e->cerrar();
 }
 
 Puente::Resumen Puente::resumen() const
@@ -423,7 +429,7 @@ juce::var Puente::operacion (ConexionControl& c, const juce::var& p)
             o->setProperty ("instancias", (int) instancias.size());
         }
         juce::Array<juce::var> caps;
-        for (auto c : { "capturarEditor", "escalarEditor", "ventanaSynz", "sensoresOsc" })
+        for (auto c : { "capturarEditor", "escalarEditor", "ventanaSynz", "sensoresOsc", "entradas" })
             caps.add (c);
         o->setProperty ("capacidades", caps);
         o->setProperty ("osc", osc.puerto());       // el puerto UDP de los sensores (-1 si no está abierto)       // lo que sabe hacer este puente: el estudio avisa si le falta algo que usa
@@ -459,6 +465,33 @@ juce::var Puente::operacion (ConexionControl& c, const juce::var& p)
 
     if (op == "crear")
         return opCrear (c, p);
+
+    // Las entradas de la tarjeta (1.4.0): lo que hay y abrir una.
+    if (op == "dispositivos")
+    {
+        const bool prueba = opciones.entradaPrueba;
+        return enMensajes ([prueba]() -> juce::var
+        {
+            auto r = okVar();
+            r.getDynamicObject()->setProperty ("dispositivos", Entrada::listar (prueba));
+            return r;
+        });
+    }
+    if (op == "abrirEntrada")
+        return opAbrirEntrada (c, p);
+    if (op == "destruir")
+    {
+        // Una entrada se cierra con el mismo «destruir» que un plugin.
+        const int id = (int) p.getProperty ("instancia", -1);
+        bool esEntrada = false;
+        {
+            std::lock_guard<std::mutex> g (mutexInstancias);
+            auto it = entradas.find (id);
+            esEntrada = it != entradas.end() && it->second->propietario == c.id;
+        }
+        if (esEntrada)
+            return enMensajes ([this, id]() -> juce::var { cerrarEntrada (id); return okVar(); });
+    }
 
     static const juce::StringArray opsDeInstancia { "destruir", "abrirEditor", "cerrarEditor", "capturarEditor", "escalarEditor", "leerEstado", "ponerEstado",
                                                     "leerParametros", "ponerParametro" };
@@ -650,6 +683,85 @@ juce::var Puente::opCrear (ConexionControl& c, const juce::var& p)
     return r;
 }
 
+juce::var Puente::opAbrirEntrada (ConexionControl& c, const juce::var& p)
+{
+    Entrada::Pedido pedido;
+    pedido.tipo        = p.getProperty ("tipo", juce::var()).toString();
+    pedido.dispositivo = p.getProperty ("dispositivo", juce::var()).toString();
+    pedido.frecuencia  = (double) p.getProperty ("frecuencia", 48000.0);
+    pedido.bloqueMax   = (int) p.getProperty ("bloqueMax", 512);
+    if (auto* lista = p.getProperty ("canales", juce::var()).getArray())
+        for (auto& v : *lista)
+            pedido.canales.add ((int) v);
+    if (pedido.tipo.isEmpty() || pedido.dispositivo.isEmpty())
+        return errorVar ("peticion_invalida", "faltan «tipo» y «dispositivo»"_es);
+    {
+        std::lock_guard<std::mutex> g (mutexInstancias);
+        if ((int) (instancias.size() + entradas.size()) >= maxInstancias)
+            return errorVar ("limite", "demasiadas cosas abiertas a la vez");
+        for (auto& [id, e] : entradas)
+            if (e->clave == pedido.tipo + "|" + pedido.dispositivo)
+                return errorVar ("limite", "esa tarjeta ya está abierta"_es);
+    }
+    const int origenId = c.id;
+    const auto origen = c.origen;
+    const bool prueba = opciones.entradaPrueba;
+    auto r = enMensajes ([&]() -> juce::var
+    {
+        int nuevoId;
+        {
+            std::lock_guard<std::mutex> g (mutexInstancias);
+            nuevoId = siguienteInstancia++;
+        }
+        juce::String error;
+        auto e = Entrada::abrir (nuevoId, pedido, prueba, error);
+        if (e == nullptr)
+        {
+            log.escribir ("No se pudo abrir la entrada " + pedido.dispositivo + ": " + error);
+            return errorVar ("no_disponible", error);
+        }
+        e->ticket = ticketNuevo();
+        e->origen = origen;
+        e->propietario = origenId;
+        {
+            std::lock_guard<std::mutex> g (mutexInstancias);
+            entradas[nuevoId] = e;
+        }
+        log.escribir ("Entrada abierta: " + pedido.dispositivo + " (" + juce::String ((int) e->describir().getProperty ("canales", 0)) + " canales, instancia " + juce::String (nuevoId) + ")");
+        auto resp = e->describir();
+        resp.getDynamicObject()->setProperty ("ok", true);
+        return resp;
+    });
+    notificarCambio();
+    return r;
+}
+
+void Puente::cerrarEntrada (int id)
+{
+    JUCE_ASSERT_MESSAGE_THREAD
+    std::shared_ptr<Entrada> e;
+    std::shared_ptr<WsConexion> audio;
+    {
+        std::lock_guard<std::mutex> g (mutexInstancias);
+        auto it = entradas.find (id);
+        if (it == entradas.end())
+            return;
+        e = it->second;
+        entradas.erase (it);
+        auto a = audios.find (id);
+        if (a != audios.end())
+        {
+            audio = a->second;
+            audios.erase (a);
+        }
+    }
+    if (audio != nullptr)
+        audio->cortar();
+    e->cerrar();
+    log.escribir ("Entrada cerrada (instancia " + juce::String (id) + ", " + juce::String (e->cortes()) + " cortes)");
+    notificarCambio();
+}
+
 void Puente::destruirInstancia (int id)
 {
     JUCE_ASSERT_MESSAGE_THREAD
@@ -684,12 +796,16 @@ void Puente::destruirInstanciasDe (int propietario)
         for (auto& [id, inst] : instancias)
             if (inst->propietario == propietario)
                 ids.push_back (id);
+        for (auto& [id, e] : entradas)
+            if (e->propietario == propietario)
+                ids.push_back (-id);            // negativo: es una entrada
     }
     for (int id : ids)
     {
+        auto quita = [this, id] { if (id < 0) cerrarEntrada (-id); else destruirInstancia (id); };
         if (juce::MessageManager::getInstance()->isThisTheMessageThread())
-            destruirInstancia (id);
-        else if (! juce::MessageManager::callSync ([this, id] { destruirInstancia (id); }))
+            quita();
+        else if (! juce::MessageManager::callSync (quita))
         {
             // El programa se está cerrando: `detener()` se ocupa de lo que quede.
         }
@@ -702,11 +818,20 @@ void Puente::atenderAudio (std::shared_ptr<WsConexion> ws, const SolicitudWs& so
 {
     const int id = solicitud.ruta.fromFirstOccurrenceOf ("/audio/", false, false).getIntValue();
     std::shared_ptr<Instancia> inst;
+    std::shared_ptr<Entrada> ent;
     {
         std::lock_guard<std::mutex> g (mutexInstancias);
         auto it = instancias.find (id);
         if (it != instancias.end())
             inst = it->second;
+        auto e = entradas.find (id);
+        if (e != entradas.end())
+            ent = e->second;
+    }
+    if (ent != nullptr)
+    {
+        atenderAudioEntrada (std::move (ws), solicitud, ent);
+        return;
     }
     // Hace falta el ticket que devolvió `crear` y el mismo origen que la creó.
     if (inst == nullptr || inst->ticket != valorDeConsulta (solicitud.consulta, "t") || inst->origen != solicitud.origen)
@@ -762,6 +887,61 @@ void Puente::atenderAudio (std::shared_ptr<WsConexion> ws, const SolicitudWs& so
     }
 
     inst->audioConectado = false;
+    std::lock_guard<std::mutex> g (mutexInstancias);
+    auto a = audios.find (id);
+    if (a != audios.end() && a->second == ws)
+        audios.erase (a);
+}
+
+// El canal de audio de una entrada de la tarjeta: las mismas peticiones (sin audio que mandar), y las respuestas traen sus canales.
+void Puente::atenderAudioEntrada (std::shared_ptr<WsConexion> ws, const SolicitudWs& solicitud, std::shared_ptr<Entrada> ent)
+{
+    const int id = ent->id;
+    if (ent->ticket != valorDeConsulta (solicitud.consulta, "t") || ent->origen != solicitud.origen || ent->audioConectado.exchange (true))
+    {
+        ws->cerrar (1008);
+        return;
+    }
+    {
+        std::lock_guard<std::mutex> g (mutexInstancias);
+        if (entradas.find (id) == entradas.end())
+        {
+            ent->audioConectado = false;
+            ws->cerrar (1008);
+            return;
+        }
+        audios[id] = ws;
+    }
+    std::vector<uint8_t> peticion, respuesta;
+    peticion.reserve (maxTramaAudio);
+    respuesta.reserve (16 + (size_t) maxCanalesEntrada * maxBloque * 4);
+    bool texto = false;
+    while (ws->abierta())
+    {
+        const auto r = ws->leer (peticion, texto, 1000);
+        if (r == WsConexion::Resultado::TiempoAgotado)
+        {
+            std::lock_guard<std::mutex> g (mutexInstancias);
+            if (entradas.find (id) == entradas.end())
+                break;
+            continue;
+        }
+        if (r != WsConexion::Resultado::Mensaje)
+            break;
+        if (texto || peticion.size() > maxTramaAudio)
+        {
+            ws->cerrar (texto ? 1003 : 1009);
+            break;
+        }
+        if (! ent->procesar (peticion.data(), peticion.size(), respuesta))
+        {
+            ws->cerrar (1002);
+            break;
+        }
+        if (! ws->enviarBinario (respuesta.data(), respuesta.size()))
+            break;
+    }
+    ent->audioConectado = false;
     std::lock_guard<std::mutex> g (mutexInstancias);
     auto a = audios.find (id);
     if (a != audios.end() && a->second == ws)

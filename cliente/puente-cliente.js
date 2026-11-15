@@ -125,6 +125,35 @@ export class PuenteCliente {
   }
 
   async plugins() { return (await this.pedir('listar')).plugins; }
+
+  /** Las tarjetas de sonido con entradas (puente 1.4.0): `[{ tipo, nombre, entradas, frecuencias }]`. */
+  async dispositivos() { return (await this.pedir('dispositivos')).dispositivos; }
+
+  /**
+   * Abre las entradas de una tarjeta (puente 1.4.0; el navegador solo da 2). Devuelve una instancia cuyo `out` es un nodo con
+   * un canal por entrada pedida (hasta 32), en el orden de la tarjeta. `opciones`: `canales` (índices de entrada, 0 = la 1;
+   * sin él, todas), `bloque`, `colchon`. El puente absorbe la diferencia entre el reloj de la tarjeta y el del navegador.
+   * `latenciaMuestras()` dice cuánto llega tarde lo que entra (tarjeta, búfer del puente y conducto).
+   */
+  async abrirEntrada(ctx, tipo, dispositivo, opciones = {}) {
+    const bloque = opciones.bloque ?? 128;
+    // Más colchón que un plugin (4 bloques, ~11 ms): cada respuesta trae hasta 32 canales (16 KB) y el conducto da más tirones.
+    const colchon = opciones.colchon ?? 4 * bloque;
+    if (bloque % 128 !== 0 || bloque < 128 || bloque > 2048) throw new ErrorPuente('peticion_invalida', 'el bloque tiene que ser un múltiplo de 128 entre 128 y 2048');
+    const info = await this.pedir('abrirEntrada', { tipo, dispositivo, canales: opciones.canales, frecuencia: ctx.sampleRate, bloqueMax: bloque });
+    try {
+      await cargarWorklet(ctx, opciones.workletUrl ?? new URL('./puente-worklet.js', import.meta.url));
+      const datos = { ...info, instrumento: false, editor: false, parametros: [], latencia: 0, entradas: 0, salidas: info.canales };
+      const inst = new InstanciaPuente(this, ctx, datos, bloque, colchon, { ...opciones, calibrar: false, multicanal: true });
+      this.instancias.set(info.instancia, inst);
+      await inst._abrirAudio();
+      return inst;
+    } catch (e) {
+      this.instancias.delete(info.instancia);
+      this.pedir('destruir', { instancia: info.instancia }).catch(() => {});
+      throw e;
+    }
+  }
   async escanear(forzar = false) { return this.pedir('escanear', { forzar }); }
 
   /**
@@ -173,12 +202,15 @@ export class InstanciaPuente {
     this._oyentes = { parametro: new Set(), editorCerrado: new Set(), caida: new Set() };
 
     const entradas = Math.min(2, info.entradas);
-    const salidas = Math.max(1, Math.min(2, info.salidas));
+    // Un plugin devuelve 1 o 2 canales; las entradas de una tarjeta, todos los que se abrieron (hasta 32), cada uno por su canal.
+    const salidas = opciones.multicanal ? Math.max(1, Math.min(32, info.salidas)) : Math.max(1, Math.min(2, info.salidas));
+    this.canales = opciones.multicanal ? salidas : 2;
+    this.nombresCanales = info.nombres || null;
     // Nada de crear antes de usar: el nodo y el Worker nacen con la instancia y mueren con ella (dispose).
     this.nodo = new AudioWorkletNode(ctx, 'synz-puente', {
       numberOfInputs: entradas > 0 ? 1 : 0,
       numberOfOutputs: 1,
-      outputChannelCount: [2],
+      outputChannelCount: [this.canales],
       channelCount: 2,
       channelCountMode: 'explicit',
       channelInterpretation: 'speakers',

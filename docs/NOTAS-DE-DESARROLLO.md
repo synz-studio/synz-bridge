@@ -79,6 +79,30 @@ Además de los plugins, el puente recibe **OSC por UDP** (puerto 9000) y lo pasa
 solo escucha a este ordenador; `--osc-red` lo abre a la red (TouchOSC en una tableta) y `--puerto-osc N` cambia el puerto
 (`-1` lo apaga). Detalle en `PROTOCOLO.md` §5 y en `docs/guidelines/sensores.md`. Prueba: `sensores.test.mjs`.
 
+## Entradas de la tarjeta (desde la 1.4.0)
+
+Para SYNZ Repertoire («el maestro recibe cada puesto por cable»): el navegador solo deja abrir **dos** entradas de una tarjeta (Chrome
+lo tiene fijado en 2). El puente la abre con todas las que hagan falta, hasta 32, y se las da al estudio por el mismo conducto que
+los plugins. Detalle en `PROTOCOLO.md` §6.
+
+```js
+const tarjetas = await puente.dispositivos();                       // [{ tipo, nombre, entradas, frecuencias }]
+const ent = await puente.abrirEntrada(ctx, t.tipo, t.nombre, { canales: [0, 1, 2, 3] });   // sin canales: todas
+ent.out;                 // un nodo con un canal por entrada, en el orden de la tarjeta (ent.canales, ent.nombresCanales)
+ent.latenciaMuestras();  // lo que llega tarde lo que entra (tarjeta + búfer del puente + conducto)
+ent.dispose();
+```
+
+- **Dos relojes**: la tarjeta y el navegador nunca van igual del todo (decenas de ppm: en una obra de 15 minutos, decenas de ms). El
+  puente remuestrea con una razón que se corrige sola según lo lleno que está su búfer: sin cortes y con el retardo quieto.
+  Medido con la tarjeta de prueba a ±300 ppm: los 32 canales en su sitio, 20 s sin un salto en la onda y el retardo (unos 18 ms en el
+  puente) quieto.
+- Colchón de 4 bloques en el navegador (más que un plugin: cada respuesta trae hasta 32 canales).
+- **Windows**: hoy abre lo que da el sistema (WASAPI, DirectSound). Muchas tarjetas grandes solo enseñan todas sus entradas por
+  **ASIO**, que no está compilado (hace falta el SDK de Steinberg). Para Córdoba: maestro en Mac (CoreAudio enseña todas) o añadir ASIO.
+- **En el estudio**: en el selector de entrada de una pista, «Más entradas con SYNZ Bridge…» busca las tarjetas del puente, que salen como
+  «SYNZ Bridge · <tarjeta> (N)» con sus In 1…In 32. Su retardo cuenta al colocar lo grabado. Prueba: `estudio-entradas.test.mjs`.
+
 ## Seguridad
 
 - Solo escucha en `127.0.0.1`. Comprueba la cabecera `Host` (contra DNS rebinding) y exige `Origin`.
@@ -100,6 +124,8 @@ solo escucha a este ordenador; `--osc-red` lo abre a la red (TouchOSC en una tab
     EXE_PUENTE="…/SYNZ Bridge" VST3_DIR=…/vst3-pruebas node --test cliente.test.mjs    # Chromium real (8)
     EXE_PUENTE="…/SYNZ Bridge" VST3_DIR=…/vst3-pruebas node --test estudio.test.mjs    # el estudio compilado (play/) + puente + VST3 (2)
     node --test sincronia.test.mjs                                                      # la copia del cliente en el estudio al día (1)
+    EXE_PUENTE="…/SYNZ Bridge" node --test entradas.test.mjs                           # entradas de la tarjeta, ±300 ppm, Chromium real (8)
+    EXE_PUENTE="…/SYNZ Bridge" node --test estudio-entradas.test.mjs                   # una pista de entrada del estudio con la tarjeta del puente (1)
 
 Las de plugins y navegador usan `xvfb-run` (ventanas de plugins reales) y Chromium de Playwright (`CHROMIUM=ruta` si no
 está en `/opt/pw-browsers/chromium`). `node pruebas/medir-latencia.mjs` imprime una tabla de retardos por tamaño de bloque.
@@ -146,6 +172,10 @@ navegador, no el puente. Si el audio se corta, el colchón sube solo un bloque c
 - Plugins reales de terceros: solo los de prueba (los tres VST3 de `pruebas/plugins`). Con plugins comerciales puede haber
   sorpresas (editores que piden el hilo principal, iLok/licencias, plugins que tardan en cargar).
 - Nada se ha **oído**: se mide con señales de prueba.
+- Las **entradas de la tarjeta** (1.4.0) solo con la tarjeta de prueba: ninguna tarjeta real, ni 32 canales de verdad. En este entorno
+  hay un corte suelto cada ~20 s con 32 canales (no con 2): el puente contesta en 1–4 ms y con el 1–2 % de carga en ese momento, así
+  que es una parada del hilo de audio de este Chromium sin tarjeta; la prueba repite la medición, como las de plugins. Comprobarlo en
+  un ordenador de verdad.
 - Sin firma de código ni notarización (macOS lo bloqueará; Windows avisará de «editor desconocido»).
 - Chrome pide permiso de «acceso a la red local» al abrir `ws://127.0.0.1` desde una página https; el flujo no se ha
   probado en un Chrome con interfaz.
