@@ -47,6 +47,8 @@ Códigos de error: `peticion_invalida`, `operacion_desconocida`, `plugin_descono
 | `ponerEstado` | `instancia`, `estado` (base64) | `parametros`: lista actualizada |
 | `leerParametros` | `instancia` | `valores`: `[valor, …]` (0 a 1, en el orden de `parametros`) |
 | `ponerParametro` | `instancia`, `i`, `valor` (0 a 1) | — |
+| `dispositivos` | — | `dispositivos`: `[{ tipo, nombre, entradas, frecuencias }]` — las tarjetas con entradas (desde la 1.4.0; ver §6) |
+| `abrirEntrada` | `tipo`, `dispositivo`, `canales` (opcional: índices de entrada, 0 = la 1; sin él, todas, hasta 32), `frecuencia` (la del estudio), `bloqueMax` | `instancia`, `ticket`, `tipo`, `nombre`, `canales` (cuántos), `nombres`, `frecuenciaTarjeta`, `latenciaTarjeta`, `objetivo` (ver §6). Se cierra con `destruir` |
 
 `valor` y `porDefecto` van **normalizados (0 a 1)**. `etiqueta` es el texto de unidad («dB», «Hz»). `pasos` es el
 número de valores discretos, o 0 si es continuo.
@@ -156,3 +158,22 @@ mensaje**, como mucho cada 8 ms, solo con lo que cambió:
 
 El alta se repite cuando un sensor gana una salida o un rango, y para todos cuando se conecta alguien nuevo. Lo que mande el
 estudio por esta ruta se lee y se descarta.
+
+## 6. Entradas de la tarjeta (desde la 1.4.0)
+
+Para SYNZ Repertoire: el ordenador maestro recibe cada puesto **por cable**, en una entrada de su tarjeta, y el navegador solo deja
+abrir dos (Chrome lo tiene fijado en 2). El puente abre la tarjeta con las que hagan falta (hasta 32), y `hola` lleva la capacidad
+`entradas`.
+
+- `abrirEntrada` devuelve una `instancia` y un `ticket`, como `crear`, y su canal de audio es el mismo `/audio/<instancia>?t=<ticket>`.
+  Cuenta en el límite de 32 instancias. La misma tarjeta (tipo y nombre) no se abre dos veces a la vez (`limite`).
+- Las **peticiones** son las de siempre, sin audio de entrada (`canales` 0) y sin MIDI. Las **respuestas** traen `canales` = los
+  abiertos, en el orden de la tarjeta, y en `latencia` lo que tarda en llegar al estudio lo que entra por la tarjeta (su búfer y lo
+  que guarda el puente), en muestras del estudio. Bandera nueva de la respuesta: **bit 2**, no había audio de la tarjeta (sale silencio).
+- **Dos relojes.** La tarjeta graba con el suyo y el estudio pide con el del navegador: casi iguales, nunca del todo. El puente guarda
+  lo que llega en un búfer y, al servir cada bloque, remuestrea (Lagrange) con una razón que se corrige sola para que el búfer se quede
+  en `objetivo` muestras de la tarjeta (dos bloques de la tarjeta, el bloque del estudio y 256 de holgura). Corrección máxima,
+  ±2000 ppm (3,5 centésimas de afinación: no se oye). Si la tarjeta admite la frecuencia del estudio, se abre a esa.
+- Si el estudio deja de pedir un rato, lo que sobra de 0,2 s se tira para no quedarse atrasado.
+- **Pruebas sin tarjeta:** con `--entrada-prueba`, `dispositivos` lista también `{ tipo: "Prueba", nombre: "Prueba", entradas: 32 }`:
+  32 tonos (200 Hz + 50 Hz por canal) con un reloj desviado `SYNZ_PRUEBA_PPM` (variable de entorno) del del ordenador.

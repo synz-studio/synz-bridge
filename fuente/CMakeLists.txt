@@ -14,6 +14,7 @@ target_sources(synz-puente PRIVATE
   Main.cpp
   Puente.cpp
   Instancia.cpp
+  Entrada.cpp
   Escaner.cpp
   SensoresOsc.cpp
   ${SYNZ_WS_FUENTES})
@@ -41,6 +42,7 @@ target_compile_definitions(synz-puente PRIVATE
 
 target_link_libraries(synz-puente PRIVATE
   juce::juce_audio_processors
+  juce::juce_audio_devices
   juce::juce_gui_basics
   juce::juce_events
   juce::juce_osc

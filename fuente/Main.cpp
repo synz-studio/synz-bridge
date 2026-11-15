@@ -16,6 +16,7 @@
 //   --puerto-osc N           puerto UDP del OSC para los sensores del estudio (9000 por defecto; -1 = sin OSC; 0 = que lo elija el sistema)
 //   --osc-red                el OSC escucha en toda la red, no solo en este ordenador (TouchOSC desde una tableta)
 //   --cerrar-con-entrada     se cierra cuando se cierra su entrada estándar (lo usan las pruebas)
+//   --entrada-prueba         ofrece la tarjeta «Prueba»: 32 tonos sin tarjeta, con la deriva de SYNZ_PRUEBA_PPM (lo usan las pruebas)
 // Uso interno: --escanear-uno FORMATO ARCHIVO (lo lanza el propio programa para mirar un plugin en un proceso aparte).
 #include "Escaner.h"
 #include "Texto.h"
@@ -89,6 +90,7 @@ public:
             else if (a == "--plazo-escaneo-ms")   o.plazoEscaneoMs = sig().getIntValue();
             else if (a == "--puerto-osc")         o.puertoOsc = sig().getIntValue();
             else if (a == "--osc-red")            o.oscRed = true;
+            else if (a == "--entrada-prueba")     o.entradaPrueba = true;
             else if (a == "--cerrar-con-entrada") cerrarConEntrada = true;
         }
 

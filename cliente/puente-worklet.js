@@ -13,7 +13,7 @@ class ProcesadorPuente extends AudioWorkletProcessor {
     const o = opciones.processorOptions;
     this.bloque = o.bloque;                       // múltiplo de 128
     this.entradas = o.entradas;                   // canales de entrada que se mandan (0, 1 o 2)
-    this.salidas = o.salidas;                     // canales que devuelve el plugin (1 o 2 se usan)
+    this.salidas = o.salidas;                     // canales que devuelve el plugin (1 o 2 se usan) o la tarjeta (hasta 32)
     this.colchon = o.colchon;
     this.colchonMax = o.colchonMax | 0;           // tope al que sube solo el colchón si hay cortes (0 = fijo)
     this.vivo = true;
@@ -37,7 +37,8 @@ class ProcesadorPuente extends AudioWorkletProcessor {
     while (cap < 8 * (this.bloque + Math.max(this.colchon, this.colchonMax))) cap *= 2;
     this.cap = cap;
     this.mascara = cap - 1;
-    this.anillo = [new Float32Array(cap), new Float32Array(cap)];
+    // Un anillo por canal de salida: dos para un plugin (uno solo suena por los dos lados), N para las entradas de una tarjeta.
+    this.anillo = Array.from({ length: Math.max(2, this.salidas | 0) }, () => new Float32Array(cap));
     this.esc = 0;
     this.lec = 0;
     this.cebado = false;
@@ -101,7 +102,7 @@ class ProcesadorPuente extends AudioWorkletProcessor {
 
     const datos = new Float32Array(b, 16, canales * muestras);
     if (this.cap - (this.esc - this.lec) < muestras) { this.descartes++; this.lec = this.esc - this.colchon; }   // anillo lleno: se tira lo viejo
-    for (let k = 0; k < 2; k++) {
+    for (let k = 0; k < this.anillo.length; k++) {
       const src = datos.subarray(Math.min(k, canales - 1) * muestras, Math.min(k, canales - 1) * muestras + muestras);   // un canal solo suena por los dos lados
       const dst = this.anillo[k];
       for (let i = 0; i < muestras; i++) dst[(this.esc + i) & this.mascara] = src[i];
@@ -170,7 +171,7 @@ class ProcesadorPuente extends AudioWorkletProcessor {
     if (this.cebado && disponible >= CUANTO) {
       const l = this.lec;
       for (let k = 0; k < sal.length; k++) {
-        const origen = this.anillo[Math.min(k, 1)];
+        const origen = this.anillo[Math.min(k, this.anillo.length - 1)];
         const dst = sal[k];
         for (let i = 0; i < CUANTO; i++) dst[i] = origen[(l + i) & this.mascara];
       }

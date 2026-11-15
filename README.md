@@ -26,6 +26,13 @@ Processing, Python…) y lo pasa al estudio como sensores de SONOLAB. En el estu
 Por defecto solo escucha a este ordenador; `--osc-red` lo abre a la red (TouchOSC en una tableta), `--puerto-osc N` cambia el
 puerto y `--puerto-osc -1` lo apaga. Detalle en [`PROTOCOLO.md`](PROTOCOLO.md) §5.
 
+## Entradas de la tarjeta (desde la 1.4.0)
+
+El navegador solo deja abrir dos entradas de una tarjeta de sonido. El puente la abre con todas las que hagan falta (hasta 32) y se las
+da al estudio, absorbiendo la diferencia entre el reloj de la tarjeta y el del navegador. En el estudio: el selector de entrada de una
+pista › «Más entradas con SYNZ Bridge…». Sirve, por ejemplo, para que un ordenador maestro reciba por cable a varios músicos. Detalle en
+[`PROTOCOLO.md`](PROTOCOLO.md) §6.
+
 ## Compilar
 
 Hace falta CMake 3.22 o superior y un compilador de C++17 (MSVC, Clang o GCC). JUCE 8.0.9 se descarga solo.
@@ -42,6 +49,7 @@ El programa queda en `build/fuente/synz-puente_artefacts/Release/`.
     EXE_PUENTE="…/SYNZ Bridge" VST3_DIR=…/vst3-pruebas node --test puente.test.mjs   # puente con plugins VST3 de prueba
     EXE_PUENTE="…/SYNZ Bridge" node humo.mjs                                     # arranca, responde y escanea
     EXE_PUENTE="…/SYNZ Bridge" node --test sensores.test.mjs                     # sensores por OSC
+    EXE_PUENTE="…/SYNZ Bridge" node --test entradas.test.mjs                     # entradas de la tarjeta (con --entrada-prueba)
 
 ## Más información
 
